@@ -1,0 +1,327 @@
+<!-- the real bpm finder can be found at https://seanprailton.com/bpmfinder/. This page shows the code that inserts into the wordpress code snippet -->
+
+<style>
+  body {
+    height: 80vh;
+    text-align: center !important;
+  }
+  .container {
+    height: 85vh;
+  }
+  h1 {
+    font-weight: bold;
+    text-align: center;
+  }
+  img {
+    display: block;
+    margin: 0 auto;
+  }
+  .search-container {
+    margin-top: 50px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    animation: fadeIn 1s linear 1s forwards;
+  }
+  /* Wrap the input and button in a form to help with centering */
+  .search-container form {
+    display: inline-block;
+  }
+  .search-container input[type="text"] {
+    width: 300px;
+    padding: 10px 15px;
+    border: 2px solid #ccc;
+    border-radius: 25px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+  }
+  .search-container input[type="text"]:focus {
+    outline: none;
+    border-color: #4d4d4d;
+  }
+  .search-container button {
+    padding: 10px 20px;
+    margin-left: 10px;
+    border: none;
+    border-radius: 25px;
+    background-color: #4d4d4d;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  .search-container button:hover {
+    background-color: #757575;
+  }
+  .spacer {
+    height: 120px;
+  }
+  .spacer2 {
+    height: 10px;
+  }
+  .name {
+    font-size: small;
+    text-align: center;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .song-name {
+    font-weight: bold;
+    font-size: 45px;
+    opacity: 0;
+    animation: fadeIn 2s linear forwards;
+  }
+  .artist-name {
+    font-weight: bold;
+    font-size: 45px;
+    opacity: 0;
+    animation: fadeIn 2s linear 1s forwards;
+  }
+  .by {
+    opacity: 0;
+    animation: fadeIn 2s linear 0.7s forwards;
+  }
+  .by2 {
+    opacity: 0;
+    animation: fadeIn 2s linear 3s forwards;
+  }
+  .startOver {
+    opacity: 0;
+    animation: fadeIn 3s linear 6s forwards;
+    color: #4d4d4d !important;
+    border: none;
+    background: none !important;
+  }
+  .startOver:hover {
+    color: #757575 !important;
+  }
+  .SEARCH {
+    opacity: 0;
+    animation: fadeIn 1s linear 0.7s forwards;
+    /* The button styling is now handled by .search-container button */
+  }
+  .SEARCH:hover {
+    /* Hover effect is handled by .search-container button:hover */
+  }
+  p.results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    text-align: center;
+    margin: 0;
+    /* turn off selectability */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  .bpm {
+    font-size: 100px;
+    font-weight: bold;
+    opacity: 0;
+    animation: fadeIn 2s linear 3s forwards,
+      spinHorizontal 20s linear 5s infinite;
+  }
+  .metronome {
+    font-size: 15px;
+    font-weight: lighter;
+    font-style: italic;
+    opacity: 0;
+    animation: fadeIn 2s linear 3.5s forwards;
+  }
+  @keyframes spinHorizontal {
+    from {
+      transform: rotateY(0deg);
+    }
+    to {
+      transform: rotateY(360deg);
+    }
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+</style>
+<div id="container">
+  <img
+    src="https://seanprailton.com/wp-content/uploads/2024/01/BPM-finder_-line-art-removebg-preview.png"
+    alt=""
+  />
+  <h1>bpm finder</h1>
+  <div class="spacer"></div>
+  <div class="search-container" id="search-container">
+    <form onsubmit="displayTopResult(); return false;">
+      <input type="text" id="songSearch" placeholder="Enter a song name..." />
+      <button type="submit" class="SEARCH">Search</button>
+    </form>
+    <div class="spacer"></div>
+    <div class="name">
+      <span>Built by Sean Railton, using the Spotify API. HOW TO USE: Enter any song name, including the artist, and</span>
+      <span>the finder will pull out the most relevant match and give you the average beats per minute. See how</span>
+      <span>the finder was built
+        <a
+          href="https://seanprailton.com/creating-a-bpm-finder-using-the-spotify-api/"
+          target="_blank"
+          style="text-decoration: underline"
+          >here</a
+        >.
+      </span>
+    </div>
+  </div>
+</div>
+<script>
+  const container = document.getElementById("container");
+  let songID;
+  let accesstoken;
+  let bpmResult;
+  let searchResultsArray;
+  let searchTerm;
+  let artistName;
+  let songName;
+
+  const searchTermInput = document.getElementById("songSearch");
+  if (searchTermInput) {
+    searchTermInput.addEventListener("input", function (event) {
+      searchTerm = event.target.value;
+    });
+  } else {
+    console.error("the search input not found");
+  }
+
+  function getToken() {
+    return fetch(
+      "/Website_dependencies/Spotify BPM Finder v17 PHP.php?action=getToken"
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        accesstoken = data.access_token;
+        return accesstoken;
+      })
+      .catch((error) => {
+        console.error("Error fetching access token:", error);
+      });
+  }
+  function getTopResult() {
+    return getToken()
+      .then(() => {
+        return fetch(
+          `https://api.spotify.com/v1/search?q=${searchTerm}&type=track&limit=5`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${accesstoken}`,
+            },
+          }
+        );
+      })
+      .then((response) => {
+        return response.json();
+      })
+      .then((jsonresponse) => {
+        searchResultsArray = jsonresponse.tracks.items;
+        artistName = searchResultsArray[0].artists[0].name;
+        songName = searchResultsArray[0].name;
+        songID = searchResultsArray[0].uri.split(":").pop();
+        return searchResultsArray[0];
+      });
+  }
+  function getBPM() {
+    return fetch(`https://api.spotify.com/v1/audio-features/${songID}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accesstoken}`,
+      },
+    })
+      .then((featuresresponse) => featuresresponse.json())
+      .then((featuresjsondata) => {
+        bpmResult = Math.round(featuresjsondata.tempo);
+        return bpmResult;
+      });
+  }
+  function displayTopResult() {
+    container.innerHTML = "";
+    getTopResult()
+      .then(() => {
+        return getBPM();
+      })
+      .then(() => {
+        container.innerHTML = `
+          <p class="results">
+            <span class="song-name">${songName}</span>
+            <span class="by"> by </span>
+            <span class="artist-name">${artistName}</span><br><br>
+            <span id="bpmm" class="bpm">${bpmResult}</span>
+            <span class="by2">bpm</span>
+            <br>
+            <span id="bpmmm" class="metronome">
+              metronome paused<br> (press the big number to start it)
+            </span>
+            <br>
+            <br>
+            <br>
+            <button onclick="location.reload()" class="startOver">Start Over</button>
+          </p>
+        `;
+        initializeMetronome();
+      });
+  }
+  searchTermInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      displayTopResult();
+    }
+  });
+  function initializeMetronome() {
+    let intervalId;
+    let isPlaying = false;
+    let metronomeBuffer;
+    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const startStopButton = document.getElementById("bpmm");
+    function startMetronome() {
+      isPlaying = true;
+      playMetronomeSound();
+      intervalId = setInterval(playMetronomeSound, 60000 / bpmResult);
+      document.getElementById("bpmmm").innerHTML =
+        "metronome playing <br> (press the big number to stop it)";
+    }
+    function stopMetronome() {
+      isPlaying = false;
+      clearInterval(intervalId);
+      document.getElementById("bpmmm").innerHTML =
+        "metronome paused<br> (press the big number to start it)";
+    }
+    function loadMetronomeSound() {
+      return fetch(
+        "/Website_dependencies/Spotify BPM Finder v17 PHP.php?action=getMetronome"
+      )
+        .then((response) => response.arrayBuffer())
+        .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
+        .then((buffer) => {
+          metronomeBuffer = buffer;
+        })
+        .catch((error) => {
+          console.error("Error loading metronome sound:", error);
+        });
+    }
+    function playMetronomeSound() {
+      let source = audioContext.createBufferSource();
+      source.buffer = metronomeBuffer;
+      source.connect(audioContext.destination);
+      source.start();
+    }
+    loadMetronomeSound();
+    startStopButton.addEventListener("click", toggleMetronome);
+    function toggleMetronome() {
+      if (!isPlaying) {
+        startMetronome();
+      } else {
+        stopMetronome();
+      }
+    }
+  }
+</script>
